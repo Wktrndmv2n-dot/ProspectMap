@@ -58,6 +58,15 @@
                         <button class="btn-icon" title="Ajouter un Point" onclick="app.addPointMode()">
                             <i class="fas fa-plus"></i>
                         </button>
+                        <button class="btn-icon" title="Tracer une Ligne" onclick="app.drawLineMode()">
+                            <i class="fas fa-pen"></i>
+                        </button>
+                        <button class="btn-icon" title="Terminer la Ligne" onclick="app.finishLine()">
+                            <i class="fas fa-check"></i>
+                        </button>
+                        <button class="btn-icon" title="Effacer Toutes les Lignes" onclick="app.clearAllLines()">
+                            <i class="fas fa-eraser"></i>
+                        </button>
                         <button class="btn-icon" title="Réinitialiser" onclick="app.resetMap()">
                             <i class="fas fa-redo"></i>
                         </button>
@@ -65,6 +74,23 @@
                 </div>
 
                 <div id="map" class="map-container"></div>
+
+                <!-- Légende des couleurs -->
+                <div class="legend-box">
+                    <div class="legend-title">📋 Légende des Lignes</div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #16a34a;"></div>
+                        <span>🟢 OK (Plus de 15 jours)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #ea580c;"></div>
+                        <span>🟠 Alerte (15 jours avant)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #dc2626;"></div>
+                        <span>🔴 En Retard (Passé échéance)</span>
+                    </div>
+                </div>
 
                 <!-- Info Panel -->
                 <div id="info-panel" class="info-panel hidden">
