@@ -1,0 +1,164 @@
+# ProspectMap
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProspectMap - Gestion Prospection Immobilière</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1><i class="fas fa-map"></i> ProspectMap</h1>
+                <p class="subtitle">Hyères-les-Palmiers</p>
+            </div>
+            
+            <nav class="nav-menu">
+                <button class="nav-btn active" data-section="map">
+                    <i class="fas fa-map-location-dot"></i> Carte
+                </button>
+                <button class="nav-btn" data-section="history">
+                    <i class="fas fa-history"></i> Historique
+                </button>
+                <button class="nav-btn" data-section="reminders">
+                    <i class="fas fa-bell"></i> Rappels
+                    <span class="badge" id="reminder-badge">0</span>
+                </button>
+                <button class="nav-btn" data-section="stats">
+                    <i class="fas fa-chart-bar"></i> Statistiques
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="btn-export" onclick="app.exportData()" title="Télécharger vos données">
+                    <i class="fas fa-download"></i> Exporter
+                </button>
+                <button class="btn-import" onclick="document.getElementById('import-file').click()" title="Importer des données">
+                    <i class="fas fa-upload"></i> Importer
+                </button>
+                <input type="file" id="import-file" accept=".json" style="display:none;" onchange="app.importData(event)">
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- MAP SECTION -->
+            <section id="map-section" class="content-section active">
+                <div class="map-header">
+                    <h2>📍 Carte de Prospection</h2>
+                    <div class="map-controls">
+                        <button class="btn-icon" title="Ma Position GPS" onclick="app.getUserLocation()">
+                            <i class="fas fa-location-arrow"></i>
+                        </button>
+                        <button class="btn-icon" title="Ajouter un Point" onclick="app.addPointMode()">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                        <button class="btn-icon" title="Réinitialiser" onclick="app.resetMap()">
+                            <i class="fas fa-redo"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="map" class="map-container"></div>
+
+                <!-- Info Panel -->
+                <div id="info-panel" class="info-panel hidden">
+                    <div class="info-header">
+                        <h3>📝 Détails du Point</h3>
+                        <button onclick="app.closeInfoPanel()" class="btn-close">×</button>
+                    </div>
+                    <div class="info-content">
+                        <div class="form-group">
+                            <label>🏷️ Type:</label>
+                            <select id="point-type">
+                                <option value="prospect">🔵 Prospect Visité</option>
+                                <option value="property">🟠 Maison à Vendre</option>
+                                <option value="client">🟢 Client Potentiel</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>🏠 Adresse:</label>
+                            <input type="text" id="point-address" placeholder="Ex: 123 Rue de la Paix, Hyères">
+                        </div>
+                        <div class="form-group">
+                            <label>📋 Notes:</label>
+                            <textarea id="point-notes" placeholder="Vos observations, état de la maison, intérêt du propriétaire..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>📅 Date de Visite:</label>
+                            <input type="date" id="point-date">
+                        </div>
+                        <button class="btn-primary" onclick="app.savePoint()">
+                            <i class="fas fa-save"></i> Enregistrer
+                        </button>
+                        <button class="btn-secondary" onclick="app.deletePoint()">
+                            <i class="fas fa-trash"></i> Supprimer
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- HISTORY SECTION -->
+            <section id="history-section" class="content-section">
+                <div class="section-header">
+                    <h2>📚 Historique de Prospection</h2>
+                    <div class="filters">
+                        <input type="text" id="search-input" placeholder="Rechercher une adresse..." onkeyup="app.filterHistory()">
+                        <select id="type-filter" onchange="app.filterHistory()">
+                            <option value="">Tous les types</option>
+                            <option value="prospect">🔵 Prospects visités</option>
+                            <option value="property">🟠 Maisons à vendre</option>
+                            <option value="client">🟢 Clients potentiels</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="history-list" class="history-list"></div>
+            </section>
+
+            <!-- REMINDERS SECTION -->
+            <section id="reminders-section" class="content-section">
+                <div class="section-header">
+                    <h2>⏰ Rappels de Suivi (3 mois)</h2>
+                </div>
+                <div id="reminders-list" class="reminders-list"></div>
+            </section>
+
+            <!-- STATS SECTION -->
+            <section id="stats-section" class="content-section">
+                <div class="section-header">
+                    <h2>📊 Statistiques</h2>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-total">0</div>
+                        <div class="stat-label">Points Totaux</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-today">0</div>
+                        <div class="stat-label">Aujourd'hui</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-week">0</div>
+                        <div class="stat-label">Cette Semaine</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-pending">0</div>
+                        <div class="stat-label">À Relancer (3 mois)</div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="notification-toast" class="notification-hidden"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
