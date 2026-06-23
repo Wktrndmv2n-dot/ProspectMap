@@ -3,15 +3,19 @@ class ProspectingApp {
     constructor() {
         this.map = null;
         this.markers = [];
+        this.polylines = [];
         this.points = [];
         this.selectedPoint = null;
         this.addMode = false;
+        this.drawMode = false;
+        this.drawPoints = [];
         this.hyeresCords = [43.1240, 6.6308]; // Hyères-les-Palmiers
         
         this.init();
         this.loadData();
         this.checkReminders();
         this.setupNotifications();
+        this.redrawPolylines();
     }
 
     init() {
@@ -22,10 +26,12 @@ class ProspectingApp {
             maxZoom: 19
         }).addTo(this.map);
 
-        // Add click handler for adding points
+        // Add click handler for adding points or drawing
         this.map.on('click', (e) => {
             if (this.addMode) {
                 this.createPoint(e.latlng);
+            } else if (this.drawMode) {
+                this.addDrawPoint(e.latlng);
             }
         });
 
@@ -43,6 +49,7 @@ class ProspectingApp {
         }
     }
 
+    // ===== NAVIGATION =====
     switchSection(section) {
         // Update navigation buttons
         document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -71,6 +78,7 @@ class ProspectingApp {
         }
     }
 
+    // ===== GESTION DES POINTS =====
     createPoint(latlng) {
         const point = {
             id: Date.now(),
@@ -91,7 +99,7 @@ class ProspectingApp {
         this.addMarker(point);
         this.addMode = false;
         document.querySelector('[onclick="app.addPointMode()"]').style.background = '';
-        this.showNotification('Point ajouté. Remplissez les détails.', 'info');
+        this.showNotification('📌 Point ajouté. Remplissez les détails.', 'info');
     }
 
     addMarker(point) {
@@ -171,6 +179,9 @@ class ProspectingApp {
         }
         this.markers = this.markers.filter(m => m.id !== this.selectedPoint.id);
         this.addMarker(this.selectedPoint);
+        
+        // Update polylines colors
+        this.redrawPolylines();
     }
 
     deletePoint() {
@@ -178,23 +189,36 @@ class ProspectingApp {
 
         if (!confirm('Êtes-vous sûr de vouloir supprimer ce point?')) return;
 
+        const deletedId = this.selectedPoint.id;
+
         // Remove from array
-        this.points = this.points.filter(p => p.id !== this.selectedPoint.id);
+        this.points = this.points.filter(p => p.id !== deletedId);
 
         // Remove marker from map
-        const markerObj = this.markers.find(m => m.id === this.selectedPoint.id);
+        const markerObj = this.markers.find(m => m.id === deletedId);
         if (markerObj) {
             this.map.removeLayer(markerObj.marker);
         }
-        this.markers = this.markers.filter(m => m.id !== this.selectedPoint.id);
+        this.markers = this.markers.filter(m => m.id !== deletedId);
+
+        // Remove associated polylines
+        this.polylines = this.polylines.filter(pl => {
+            if (pl.pointIds.includes(deletedId)) {
+                this.map.removeLayer(pl.polyline);
+                return false;
+            }
+            return true;
+        });
 
         this.saveData();
         this.closeInfoPanel();
         this.showNotification('🗑️ Point supprimé', 'info');
     }
 
+    // ===== MODES DE DESSIN =====
     addPointMode() {
         this.addMode = !this.addMode;
+        this.drawMode = false;
         const btn = document.querySelector('[onclick="app.addPointMode()"]');
         
         if (this.addMode) {
@@ -207,6 +231,145 @@ class ProspectingApp {
         }
     }
 
+    drawLineMode() {
+        this.drawMode = !this.drawMode;
+        this.addMode = false;
+        this.drawPoints = [];
+        const btn = document.querySelector('[onclick="app.drawLineMode()"]');
+        
+        if (this.drawMode) {
+            this.showNotification('✏️ Cliquez sur la carte pour tracer une ligne. Utilisez "Terminer ligne" pour finir.', 'info');
+            btn.style.background = 'var(--warning)';
+            btn.style.color = 'white';
+        } else {
+            btn.style.background = '';
+            btn.style.color = '';
+        }
+    }
+
+    addDrawPoint(latlng) {
+        this.drawPoints.push(latlng);
+        
+        // Affiche les points tracés temporairement
+        L.circleMarker(latlng, {
+            radius: 4,
+            fillColor: '#ea580c',
+            color: 'white',
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.8
+        }).addTo(this.map);
+
+        // Si on a au moins 2 points, on trace une ligne
+        if (this.drawPoints.length >= 2) {
+            const polyline = L.polyline(this.drawPoints, {
+                color: '#ea580c',
+                weight: 3,
+                opacity: 0.7,
+                dashArray: '5, 5'
+            }).addTo(this.map);
+        }
+    }
+
+    finishLine() {
+        if (this.drawPoints.length < 2) {
+            this.showNotification('❌ Besoin d\'au moins 2 points pour tracer une ligne', 'error');
+            return;
+        }
+
+        // Créer la polyline permanente
+        const polylineObj = {
+            id: Date.now(),
+            coordinates: this.drawPoints,
+            pointIds: [],
+            color: this.getLineColor([]),
+            date: new Date().toISOString(),
+            notes: ''
+        };
+
+        const polyline = L.polyline(this.drawPoints, {
+            color: polylineObj.color,
+            weight: 3,
+            opacity: 0.8
+        }).addTo(this.map);
+
+        this.polylines.push({ ...polylineObj, polyline });
+        this.saveData();
+        this.drawMode = false;
+        this.drawPoints = [];
+        document.querySelector('[onclick="app.drawLineMode()"]').style.background = '';
+        this.showNotification('✅ Ligne tracée avec succès!', 'success');
+    }
+
+    // ===== GESTION DES COULEURS DES LIGNES =====
+    getLineColor(pointIds) {
+        // Couleur par défaut si pas de points associés
+        if (pointIds.length === 0) {
+            return '#ea580c'; // Orange par défaut
+        }
+
+        const today = new Date();
+        const relatedPoints = this.points.filter(p => pointIds.includes(p.id));
+        
+        let hasRed = false;
+        let hasOrange = false;
+        let hasGreen = false;
+
+        relatedPoints.forEach(point => {
+            const followUpDate = new Date(point.nextFollowUp);
+            const daysDiff = Math.floor((followUpDate - today) / (1000 * 60 * 60 * 24));
+            
+            if (daysDiff < 0) {
+                hasRed = true; // 🔴 Passé la date (en retard)
+            } else if (daysDiff <= 15) {
+                hasOrange = true; // 🟠 15 jours avant l'échéance
+            } else {
+                hasGreen = true; // 🟢 OK (plus de 15 jours)
+            }
+        });
+
+        // Priorité: Rouge > Orange > Vert
+        if (hasRed) return '#dc2626'; // 🔴 Rouge - EN RETARD
+        if (hasOrange) return '#ea580c'; // 🟠 Orange - 15 jours avant
+        return '#16a34a'; // 🟢 Vert - OK
+    }
+
+    redrawPolylines() {
+        // Supprimer les anciennes polylines
+        this.polylines.forEach(pl => {
+            if (pl.polyline) {
+                this.map.removeLayer(pl.polyline);
+            }
+        });
+
+        // Redessiner avec les bonnes couleurs
+        this.polylines.forEach(pl => {
+            const newColor = this.getLineColor(pl.pointIds);
+            const newPolyline = L.polyline(pl.coordinates, {
+                color: newColor,
+                weight: 3,
+                opacity: 0.8
+            }).addTo(this.map);
+            
+            pl.color = newColor;
+            pl.polyline = newPolyline;
+        });
+    }
+
+    clearAllLines() {
+        if (!confirm('Êtes-vous sûr de vouloir supprimer toutes les lignes?')) return;
+        
+        this.polylines.forEach(pl => {
+            if (pl.polyline) {
+                this.map.removeLayer(pl.polyline);
+            }
+        });
+        this.polylines = [];
+        this.saveData();
+        this.showNotification('🗑️ Toutes les lignes supprimées', 'info');
+    }
+
+    // ===== LOCALISATION =====
     getUserLocation() {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
@@ -234,6 +397,7 @@ class ProspectingApp {
         this.map.setView(this.hyeresCords, 13);
     }
 
+    // ===== HISTORIQUE =====
     updateHistory() {
         const historyList = document.getElementById('history-list');
         historyList.innerHTML = '';
@@ -298,6 +462,7 @@ class ProspectingApp {
         this.updateHistory();
     }
 
+    // ===== RAPPELS =====
     updateReminders() {
         const remindersList = document.getElementById('reminders-list');
         remindersList.innerHTML = '';
@@ -307,7 +472,7 @@ class ProspectingApp {
             .filter(p => {
                 const followUpDate = new Date(p.nextFollowUp);
                 const daysDiff = Math.floor((today - followUpDate) / (1000 * 60 * 60 * 24));
-                return daysDiff >= -7; // Show reminders from now until 7 days before
+                return daysDiff >= -7;
             })
             .sort((a, b) => new Date(a.nextFollowUp) - new Date(b.nextFollowUp));
 
@@ -333,17 +498,23 @@ class ProspectingApp {
             item.className = `reminder-item ${isOverdue ? 'overdue' : ''}`;
             
             let daysText;
+            let colorIndicator;
             if (isOverdue) {
-                daysText = `⚠️ EN RETARD DE ${Math.abs(daysDiff)} JOUR(S)`;
+                daysText = `EN RETARD DE ${Math.abs(daysDiff)} JOUR(S)`;
+                colorIndicator = '🔴';
+            } else if (daysDiff <= 15 && daysDiff >= 0) {
+                daysText = `À RELANCER DANS ${Math.abs(daysDiff)} JOUR(S)`;
+                colorIndicator = '🟠';
             } else {
-                daysText = `⏰ À RELANCER DANS ${Math.abs(daysDiff)} JOUR(S)`;
+                daysText = `À RELANCER DANS ${Math.abs(daysDiff)} JOUR(S)`;
+                colorIndicator = '🟢';
             }
 
             item.innerHTML = `
                 <div class="reminder-content">
                     <div class="reminder-title">${point.address || 'Sans adresse'}</div>
                     <div class="reminder-date">📅 ${followUpDate.toLocaleDateString('fr-FR')}</div>
-                    <div class="reminder-days">${daysText}</div>
+                    <div class="reminder-days">${colorIndicator} ${daysText}</div>
                 </div>
                 <div class="reminder-actions">
                     <button class="reminder-btn" onclick="app.markAsFollowedUp(${point.id})">
@@ -364,6 +535,7 @@ class ProspectingApp {
             point.followed = true;
             this.saveData();
             this.updateReminders();
+            this.redrawPolylines(); // Met à jour les couleurs des lignes
             this.showNotification('✅ Suivi mis à jour', 'success');
         }
     }
@@ -374,6 +546,7 @@ class ProspectingApp {
         return d.toISOString().split('T')[0];
     }
 
+    // ===== STATISTIQUES =====
     updateStats() {
         const today = new Date();
         const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -408,8 +581,9 @@ class ProspectingApp {
         return names[type] || type;
     }
 
+    // ===== NOTIFICATIONS =====
     checkReminders() {
-        // Check for reminders every minute
+        // Check every 60 secondes
         setInterval(() => {
             const today = new Date();
             this.points.forEach(point => {
@@ -428,6 +602,9 @@ class ProspectingApp {
                     );
                 }
             });
+            
+            // Redraw polylines to update colors based on current date
+            this.redrawPolylines();
         }, 60000);
     }
 
@@ -458,21 +635,58 @@ class ProspectingApp {
         }, 3000);
     }
 
+    // ===== SAUVEGARDE/CHARGEMENT =====
     saveData() {
-        localStorage.setItem('prospectingData', JSON.stringify(this.points));
+        const dataToSave = {
+            points: this.points,
+            polylines: this.polylines.map(pl => ({
+                id: pl.id,
+                coordinates: pl.coordinates,
+                pointIds: pl.pointIds,
+                color: pl.color,
+                date: pl.date,
+                notes: pl.notes
+            }))
+        };
+        localStorage.setItem('prospectingData', JSON.stringify(dataToSave));
     }
 
     loadData() {
         const data = localStorage.getItem('prospectingData');
         if (data) {
-            this.points = JSON.parse(data);
-            this.points.forEach(point => this.addMarker(point));
-            this.updateStats();
+            try {
+                const parsed = JSON.parse(data);
+                
+                // Handle both old format (array) and new format (object)
+                if (Array.isArray(parsed)) {
+                    this.points = parsed;
+                    this.polylines = [];
+                } else {
+                    this.points = parsed.points || [];
+                    this.polylines = parsed.polylines || [];
+                }
+                
+                this.points.forEach(point => this.addMarker(point));
+                this.redrawPolylines();
+                this.updateStats();
+            } catch (e) {
+                console.error('Error loading data:', e);
+            }
         }
     }
 
     exportData() {
-        const dataStr = JSON.stringify(this.points, null, 2);
+        const dataStr = JSON.stringify({ 
+            points: this.points, 
+            polylines: this.polylines.map(pl => ({
+                id: pl.id,
+                coordinates: pl.coordinates,
+                pointIds: pl.pointIds,
+                color: pl.color,
+                date: pl.date,
+                notes: pl.notes
+            }))
+        }, null, 2);
         const dataBlob = new Blob([dataStr], { type: 'application/json' });
         const url = URL.createObjectURL(dataBlob);
         const link = document.createElement('a');
@@ -492,26 +706,42 @@ class ProspectingApp {
             try {
                 const imported = JSON.parse(e.target.result);
                 
-                if (!Array.isArray(imported)) {
-                    this.showNotification('❌ Format de fichier invalide', 'error');
-                    return;
+                let importedPoints = [];
+                let importedPolylines = [];
+
+                // Handle both old format (array) and new format (object)
+                if (Array.isArray(imported)) {
+                    importedPoints = imported;
+                } else {
+                    importedPoints = imported.points || [];
+                    importedPolylines = imported.polylines || [];
                 }
 
                 // Merge with existing data (avoid duplicates by ID)
-                const newPoints = imported.filter(ip => 
+                const newPoints = importedPoints.filter(ip => 
                     !this.points.find(p => p.id === ip.id)
                 );
 
                 this.points.push(...newPoints);
                 
+                // Add new polylines
+                this.polylines.push(...importedPolylines.filter(ip =>
+                    !this.polylines.find(p => p.id === ip.id)
+                ));
+                
                 // Clear markers and redraw
                 this.markers.forEach(m => this.map.removeLayer(m.marker));
                 this.markers = [];
+                this.polylines.forEach(pl => {
+                    if (pl.polyline) this.map.removeLayer(pl.polyline);
+                });
+                
                 this.points.forEach(p => this.addMarker(p));
+                this.redrawPolylines();
                 
                 this.saveData();
                 this.updateStats();
-                this.showNotification(`✅ ${newPoints.length} points importés`, 'success');
+                this.showNotification(`✅ ${newPoints.length} points et lignes importés`, 'success');
             } catch (err) {
                 this.showNotification('❌ Erreur lors de l\'import', 'error');
                 console.error(err);
