@@ -747,3 +747,99 @@ body {
         width: 100%;
     }
 }
+/* ===== FORMULAIRE DE LIGNE ===== */
+.line-form-panel {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    background: var(--bg-white);
+    border-radius: 12px;
+    box-shadow: var(--shadow-lg);
+    width: 350px;
+    max-height: 600px;
+    display: flex;
+    flex-direction: column;
+    z-index: 500;
+    animation: slideUp 0.3s ease;
+    border-left: 4px solid var(--warning);
+}
+
+.line-form-panel.hidden {
+    display: none;
+}
+
+.line-form-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, rgba(234, 88, 12, 0.1) 0%, transparent 100%);
+}
+
+.line-form-header h3 {
+    font-size: 16px;
+    color: var(--warning);
+}
+
+.line-form-content {
+    padding: 16px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* ===== PANNEAU D'INFO DE POLYLINE ===== */
+.polyline-info-panel {
+    background: var(--bg-white);
+    border-radius: 12px;
+    box-shadow: var(--shadow-lg);
+    width: 380px;
+    max-height: 500px;
+    display: flex;
+    flex-direction: column;
+    z-index: 500;
+    animation: slideUp 0.3s ease;
+}
+
+.polyline-info-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.polyline-info-header h3 {
+    font-size: 16px;
+    margin: 0;
+}
+
+.polyline-info-content {
+    padding: 16px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.info-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+
+.info-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.info-value {
+    font-size: 14px;
+    color: var(--text-primary);
+    padding: 8px 12px;
+    background: var(--bg-light);
+    border-radius: 6px;
+    line-height: 1.5;
+}
