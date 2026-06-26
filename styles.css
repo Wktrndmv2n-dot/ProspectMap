@@ -173,7 +173,7 @@ body {
     to { opacity: 1; }
 }
 
-/* ===== EN-TÊTE DE SECTION ===== */
+/* ===== EN-TÊTES DE SECTION ===== */
 .map-header, .section-header {
     padding: 24px;
     background: var(--bg-white);
@@ -227,43 +227,6 @@ body {
 .leaflet-container {
     height: 100%;
     width: 100%;
-}
-
-/* ===== LÉGENDE DES LIGNES ===== */
-.legend-box {
-    position: absolute;
-    bottom: 100px;
-    left: 20px;
-    background: var(--bg-white);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px;
-    box-shadow: var(--shadow-lg);
-    z-index: 400;
-    max-width: 200px;
-}
-
-.legend-title {
-    font-weight: 600;
-    font-size: 13px;
-    margin-bottom: 8px;
-    color: var(--text-primary);
-}
-
-.legend-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 6px;
-    font-size: 12px;
-    color: var(--text-secondary);
-}
-
-.legend-color {
-    width: 16px;
-    height: 16px;
-    border-radius: 2px;
-    border: 1px solid rgba(0, 0, 0, 0.2);
 }
 
 /* ===== PANNEAU D'INFOS ===== */
@@ -346,7 +309,8 @@ body {
 
 .form-group input,
 .form-group select,
-.form-group textarea {
+.form-group textarea,
+.rename-input {
     padding: 10px 12px;
     border: 1px solid var(--border);
     border-radius: 6px;
@@ -357,7 +321,8 @@ body {
 
 .form-group input:focus,
 .form-group select:focus,
-.form-group textarea:focus {
+.form-group textarea:focus,
+.rename-input:focus {
     outline: none;
     border-color: var(--primary);
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
@@ -366,6 +331,11 @@ body {
 .form-group textarea {
     resize: vertical;
     min-height: 80px;
+}
+
+.rename-input {
+    padding: 8px 10px;
+    font-size: 13px;
 }
 
 /* ===== BOUTONS ===== */
@@ -494,6 +464,21 @@ body {
 
 .history-item-badge.client {
     background: var(--success);
+}
+
+.history-item-badge.line-green {
+    background: #16a34a;
+    color: white;
+}
+
+.history-item-badge.line-orange {
+    background: #ea580c;
+    color: white;
+}
+
+.history-item-badge.line-red {
+    background: #dc2626;
+    color: white;
 }
 
 /* ===== LISTE RAPPELS ===== */
@@ -655,98 +640,6 @@ body {
     opacity: 0.3;
 }
 
-/* ===== RESPONSIVE ===== */
-@media (max-width: 768px) {
-    .sidebar {
-        width: 70px;
-    }
-
-    .sidebar-header h1 {
-        font-size: 16px;
-    }
-
-    .subtitle {
-        display: none;
-    }
-
-    .nav-btn {
-        padding: 12px;
-        font-size: 0;
-        justify-content: center;
-    }
-
-    .nav-btn i {
-        font-size: 20px;
-    }
-
-    .badge {
-        position: absolute;
-        right: 4px;
-        top: 4px;
-    }
-
-    .sidebar-footer {
-        flex-direction: column;
-    }
-
-    .btn-export, .btn-import {
-        padding: 8px;
-    }
-
-    .info-panel {
-        width: calc(100% - 40px);
-        max-width: none;
-    }
-
-    .filters {
-        flex-direction: column;
-    }
-
-    .filters input,
-    .filters select {
-        width: 100%;
-    }
-
-    .stats-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .map-header {
-        flex-direction: column;
-        gap: 12px;
-    }
-
-    .map-controls {
-        width: 100%;
-        justify-content: space-around;
-    }
-
-    .legend-box {
-        bottom: 20px;
-        left: 10px;
-        right: 10px;
-        max-width: none;
-    }
-}
-
-@media (max-width: 480px) {
-    .history-item {
-        grid-template-columns: 1fr;
-    }
-
-    .history-item-badge {
-        align-self: flex-start;
-    }
-
-    .reminder-actions {
-        flex-direction: column;
-        width: 100%;
-    }
-
-    .reminder-btn {
-        width: 100%;
-    }
-}
 /* ===== FORMULAIRE DE LIGNE ===== */
 .line-form-panel {
     position: absolute;
@@ -794,7 +687,7 @@ body {
     border-radius: 12px;
     box-shadow: var(--shadow-lg);
     width: 380px;
-    max-height: 500px;
+    max-height: 600px;
     display: flex;
     flex-direction: column;
     z-index: 500;
@@ -843,18 +736,94 @@ body {
     border-radius: 6px;
     line-height: 1.5;
 }
-/* ===== BADGES POUR LES LIGNES DANS L'HISTORIQUE ===== */
-.history-item-badge.line-green {
-    background: #16a34a;
-    color: white;
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .sidebar {
+        width: 70px;
+    }
+
+    .sidebar-header h1 {
+        font-size: 16px;
+    }
+
+    .subtitle {
+        display: none;
+    }
+
+    .nav-btn {
+        padding: 12px;
+        font-size: 0;
+        justify-content: center;
+    }
+
+    .nav-btn i {
+        font-size: 20px;
+    }
+
+    .badge {
+        position: absolute;
+        right: 4px;
+        top: 4px;
+    }
+
+    .sidebar-footer {
+        flex-direction: column;
+    }
+
+    .btn-export, .btn-import {
+        padding: 8px;
+    }
+
+    .info-panel {
+        width: calc(100% - 40px);
+        max-width: none;
+    }
+
+    .polyline-info-panel {
+        width: calc(100% - 40px);
+        max-width: none;
+    }
+
+    .filters {
+        flex-direction: column;
+    }
+
+    .filters input,
+    .filters select {
+        width: 100%;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .map-header {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .map-controls {
+        width: 100%;
+        justify-content: space-around;
+    }
 }
 
-.history-item-badge.line-orange {
-    background: #ea580c;
-    color: white;
-}
+@media (max-width: 480px) {
+    .history-item {
+        grid-template-columns: 1fr;
+    }
 
-.history-item-badge.line-red {
-    background: #dc2626;
-    color: white;
+    .history-item-badge {
+        align-self: flex-start;
+    }
+
+    .reminder-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .reminder-btn {
+        width: 100%;
+    }
 }
