@@ -6,6 +6,7 @@ class ProspectingApp {
         this.polylines = [];
         this.points = [];
         this.selectedPoint = null;
+        this.selectedPolyline = null;
         this.addMode = false;
         this.drawMode = false;
         this.drawPoints = [];
@@ -281,14 +282,84 @@ class ProspectingApp {
             return;
         }
 
+        // Afficher le formulaire pour la date de la ligne
+        this.showLineFormPanel();
+    }
+
+    showLineFormPanel() {
+        const panel = document.getElementById('line-form-panel');
+        if (!panel) {
+            // Créer le panel s'il n'existe pas
+            const newPanel = document.createElement('div');
+            newPanel.id = 'line-form-panel';
+            newPanel.className = 'line-form-panel';
+            newPanel.innerHTML = `
+                <div class="line-form-header">
+                    <h3>📅 Détails de la Ligne</h3>
+                    <button onclick="app.closeLineFormPanel()" class="btn-close">×</button>
+                </div>
+                <div class="line-form-content">
+                    <div class="form-group">
+                        <label>🏠 Adresse/Description:</label>
+                        <input type="text" id="line-address" placeholder="Ex: Route de Hyères à Lavandou">
+                    </div>
+                    <div class="form-group">
+                        <label>📅 Date de Visite:</label>
+                        <input type="date" id="line-date" value="${new Date().toISOString().split('T')[0]}">
+                    </div>
+                    <div class="form-group">
+                        <label>📋 Notes:</label>
+                        <textarea id="line-notes" placeholder="Notes sur cette ligne de prospection..."></textarea>
+                    </div>
+                    <button class="btn-primary" onclick="app.saveLineForm()">
+                        <i class="fas fa-save"></i> Créer la Ligne
+                    </button>
+                    <button class="btn-secondary" onclick="app.closeLineFormPanel()">
+                        <i class="fas fa-times"></i> Annuler
+                    </button>
+                </div>
+            `;
+            document.getElementById('map-section').appendChild(newPanel);
+        } else {
+            panel.classList.remove('hidden');
+        }
+        
+        document.getElementById('line-date').value = new Date().toISOString().split('T')[0];
+        document.getElementById('line-address').value = '';
+        document.getElementById('line-notes').value = '';
+    }
+
+    closeLineFormPanel() {
+        const panel = document.getElementById('line-form-panel');
+        if (panel) {
+            panel.classList.add('hidden');
+        }
+        this.drawMode = false;
+        this.drawPoints = [];
+        const btn = document.querySelector('[onclick="app.drawLineMode()"]');
+        btn.style.background = '';
+        btn.style.color = '';
+        this.map.dragging.enable();
+    }
+
+    saveLineForm() {
+        const address = document.getElementById('line-address').value;
+        const date = document.getElementById('line-date').value;
+        const notes = document.getElementById('line-notes').value;
+
         // Créer la polyline permanente
+        const nextFollowUp = this.getNextFollowUpDate(new Date(date));
+        
         const polylineObj = {
             id: Date.now(),
             coordinates: this.drawPoints,
             pointIds: [],
-            color: this.getLineColor([]),
-            date: new Date().toISOString(),
-            notes: ''
+            date: date,
+            nextFollowUp: nextFollowUp,
+            address: address,
+            notes: notes,
+            color: this.getLineColorByDate(date),
+            followed: false
         };
 
         const polyline = L.polyline(this.drawPoints, {
@@ -297,49 +368,127 @@ class ProspectingApp {
             opacity: 0.9
         }).addTo(this.map);
 
+        // Ajouter un click handler pour afficher les infos de la ligne
+        polyline.on('click', () => {
+            this.selectedPolyline = { ...polylineObj, polyline };
+            this.showPolylineInfo(this.selectedPolyline);
+        });
+
         this.polylines.push({ ...polylineObj, polyline });
         this.saveData();
-        this.drawMode = false;
-        this.drawPoints = [];
-        
-        const btn = document.querySelector('[onclick="app.drawLineMode()"]');
-        btn.style.background = '';
-        btn.style.color = '';
-        this.map.dragging.enable();
-        
+        this.closeLineFormPanel();
         this.showNotification('✅ Ligne tracée avec succès!', 'success');
     }
 
-    // ===== GESTION DES COULEURS DES LIGNES =====
-    getLineColor(pointIds) {
-        // Couleur par défaut si pas de points associés
-        if (pointIds.length === 0) {
-            return '#ea580c'; // Orange par défaut
-        }
-
+    showPolylineInfo(polylineObj) {
         const today = new Date();
-        const relatedPoints = this.points.filter(p => pointIds.includes(p.id));
+        const followUpDate = new Date(polylineObj.nextFollowUp);
+        const daysDiff = Math.floor((followUpDate - today) / (1000 * 60 * 60 * 24));
         
-        let hasRed = false;
-        let hasOrange = false;
-        let hasGreen = false;
-
-        relatedPoints.forEach(point => {
-            const followUpDate = new Date(point.nextFollowUp);
-            const daysDiff = Math.floor((followUpDate - today) / (1000 * 60 * 60 * 24));
-            
-            if (daysDiff < 0) {
-                hasRed = true; // 🔴 Passé la date (en retard)
-            } else if (daysDiff <= 15) {
-                hasOrange = true; // 🟠 15 jours avant l'échéance
-            } else {
-                hasGreen = true; // 🟢 OK (plus de 15 jours)
-            }
+        const visitDate = new Date(polylineObj.date);
+        const visitDateStr = visitDate.toLocaleDateString('fr-FR', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
         });
 
-        // Priorité: Rouge > Orange > Vert
-        if (hasRed) return '#dc2626'; // 🔴 Rouge - EN RETARD
-        if (hasOrange) return '#ea580c'; // 🟠 Orange - 15 jours avant
+        const followUpDateStr = followUpDate.toLocaleDateString('fr-FR', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+
+        let statusText = '';
+        let statusColor = '';
+
+        if (daysDiff < 0) {
+            statusText = `🔴 EN RETARD DE ${Math.abs(daysDiff)} JOUR(S)`;
+            statusColor = '#dc2626';
+        } else if (daysDiff <= 15) {
+            statusText = `🟠 ALERTE - À RELANCER DANS ${daysDiff} JOUR(S)`;
+            statusColor = '#ea580c';
+        } else {
+            statusText = `🟢 OK - À RELANCER DANS ${daysDiff} JOUR(S)`;
+            statusColor = '#16a34a';
+        }
+
+        const infoHtml = `
+            <div class="polyline-info-panel" style="background: ${statusColor}22; border-left: 4px solid ${statusColor};">
+                <div class="polyline-info-header">
+                    <h3>📍 ${polylineObj.address || 'Ligne sans adresse'}</h3>
+                    <button onclick="app.closePolylineInfo()" class="btn-close">×</button>
+                </div>
+                <div class="polyline-info-content">
+                    <div class="info-row">
+                        <span class="info-label">📅 Date de passage:</span>
+                        <span class="info-value">${visitDateStr}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">📅 À repasser le:</span>
+                        <span class="info-value">${followUpDateStr}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">⏰ Statut:</span>
+                        <span class="info-value" style="color: ${statusColor}; font-weight: bold;">${statusText}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">📋 Notes:</span>
+                        <span class="info-value">${polylineObj.notes || 'Aucune note'}</span>
+                    </div>
+                    <button class="btn-primary" onclick="app.markLineFollowedUp(${polylineObj.id})" style="margin-top: 12px;">
+                        ✓ Marquer comme suivi fait
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // Créer un conteneur temporaire
+        const container = document.createElement('div');
+        container.innerHTML = infoHtml;
+        container.style.position = 'absolute';
+        container.style.bottom = '100px';
+        container.style.right = '20px';
+        container.style.zIndex = '500';
+        container.style.maxWidth = '400px';
+        
+        document.getElementById('map-section').appendChild(container);
+        this.polylineInfoContainer = container;
+    }
+
+    closePolylineInfo() {
+        if (this.polylineInfoContainer) {
+            this.polylineInfoContainer.remove();
+            this.polylineInfoContainer = null;
+        }
+        this.selectedPolyline = null;
+    }
+
+    markLineFollowedUp(polylineId) {
+        const polyline = this.polylines.find(p => p.id === polylineId);
+        if (polyline) {
+            polyline.date = new Date().toISOString().split('T')[0];
+            polyline.nextFollowUp = this.getNextFollowUpDate(new Date());
+            polyline.followed = true;
+            this.saveData();
+            this.redrawPolylines();
+            this.closePolylineInfo();
+            this.showNotification('✅ Ligne marquée comme suivi fait', 'success');
+        }
+    }
+
+    // ===== GESTION DES COULEURS DES LIGNES =====
+    getLineColorByDate(date) {
+        const today = new Date();
+        const visitDate = new Date(date);
+        const nextFollowUp = this.getNextFollowUpDate(visitDate);
+        const followUpDate = new Date(nextFollowUp);
+        const daysDiff = Math.floor((followUpDate - today) / (1000 * 60 * 60 * 24));
+        
+        if (daysDiff < 0) {
+            return '#dc2626'; // 🔴 Rouge - EN RETARD
+        } else if (daysDiff <= 15) {
+            return '#ea580c'; // 🟠 Orange - 15 jours avant
+        }
         return '#16a34a'; // 🟢 Vert - OK
     }
 
@@ -353,12 +502,18 @@ class ProspectingApp {
 
         // Redessiner avec les bonnes couleurs
         this.polylines.forEach(pl => {
-            const newColor = this.getLineColor(pl.pointIds);
+            const newColor = this.getLineColorByDate(pl.date);
             const newPolyline = L.polyline(pl.coordinates, {
                 color: newColor,
                 weight: 4,
                 opacity: 0.9
             }).addTo(this.map);
+
+            // Ajouter un click handler
+            newPolyline.on('click', () => {
+                this.selectedPolyline = { ...pl, polyline: newPolyline };
+                this.showPolylineInfo(this.selectedPolyline);
+            });
             
             pl.color = newColor;
             pl.polyline = newPolyline;
@@ -544,7 +699,7 @@ class ProspectingApp {
             point.followed = true;
             this.saveData();
             this.updateReminders();
-            this.redrawPolylines(); // Met à jour les couleurs des lignes
+            this.redrawPolylines();
             this.showNotification('✅ Suivi mis à jour', 'success');
         }
     }
@@ -654,7 +809,10 @@ class ProspectingApp {
                 pointIds: pl.pointIds,
                 color: pl.color,
                 date: pl.date,
-                notes: pl.notes
+                nextFollowUp: pl.nextFollowUp,
+                address: pl.address,
+                notes: pl.notes,
+                followed: pl.followed
             }))
         };
         localStorage.setItem('prospectingData', JSON.stringify(dataToSave));
@@ -693,7 +851,10 @@ class ProspectingApp {
                 pointIds: pl.pointIds,
                 color: pl.color,
                 date: pl.date,
-                notes: pl.notes
+                nextFollowUp: pl.nextFollowUp,
+                address: pl.address,
+                notes: pl.notes,
+                followed: pl.followed
             }))
         }, null, 2);
         const dataBlob = new Blob([dataStr], { type: 'application/json' });
