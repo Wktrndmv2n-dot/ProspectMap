@@ -843,3 +843,18 @@ body {
     border-radius: 6px;
     line-height: 1.5;
 }
+/* ===== BADGES POUR LES LIGNES DANS L'HISTORIQUE ===== */
+.history-item-badge.line-green {
+    background: #16a34a;
+    color: white;
+}
+
+.history-item-badge.line-orange {
+    background: #ea580c;
+    color: white;
+}
+
+.history-item-badge.line-red {
+    background: #dc2626;
+    color: white;
+}
