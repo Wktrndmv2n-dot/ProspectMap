@@ -9,6 +9,7 @@ class ProspectingApp {
         this.selectedPolyline = null;
         this.addMode = false;
         this.drawMode = false;
+        this.deleteMode = false;
         this.drawPoints = [];
         this.hyeresCords = [43.1240, 6.6308];
         
@@ -31,6 +32,8 @@ class ProspectingApp {
                 this.createPoint(e.latlng);
             } else if (this.drawMode) {
                 this.addDrawPoint(e.latlng);
+            } else if (this.deleteMode) {
+                this.handleDeleteClick(e);
             }
         });
 
@@ -129,8 +132,12 @@ class ProspectingApp {
         }).addTo(this.map);
 
         marker.on('click', () => {
-            this.selectedPoint = point;
-            this.showInfoPanel(point);
+            if (this.deleteMode) {
+                this.deletePointById(point.id);
+            } else {
+                this.selectedPoint = point;
+                this.showInfoPanel(point);
+            }
         });
 
         this.markers.push({ id: point.id, marker });
@@ -201,9 +208,63 @@ class ProspectingApp {
         this.showNotification('🗑️ Point supprimé', 'info');
     }
 
+    deletePointById(pointId) {
+        const point = this.points.find(p => p.id === pointId);
+        if (!point) return;
+
+        if (!confirm(`Supprimer le point "${point.address}"?`)) return;
+
+        this.points = this.points.filter(p => p.id !== pointId);
+
+        const markerObj = this.markers.find(m => m.id === pointId);
+        if (markerObj) {
+            this.map.removeLayer(markerObj.marker);
+        }
+        this.markers = this.markers.filter(m => m.id !== pointId);
+
+        this.polylines = this.polylines.filter(pl => {
+            if (pl.pointIds.includes(pointId)) {
+                this.map.removeLayer(pl.polyline);
+                return false;
+            }
+            return true;
+        });
+
+        this.saveData();
+        this.showNotification('🗑️ Point supprimé', 'info');
+    }
+
+    deletePolylineById(polylineId) {
+        const polyline = this.polylines.find(p => p.id === polylineId);
+        if (!polyline) return;
+
+        if (!confirm(`Supprimer la ligne "${polyline.address}"?`)) return;
+
+        const polylineObj = this.polylines.find(p => p.id === polylineId);
+        if (polylineObj && polylineObj.polyline) {
+            this.map.removeLayer(polylineObj.polyline);
+        }
+
+        this.polylines = this.polylines.filter(p => p.id !== polylineId);
+        this.saveData();
+        this.showNotification('🗑️ Ligne supprimée', 'info');
+        this.closePolylineInfo();
+    }
+
+    handleDeleteClick(e) {
+        const layer = e.layer;
+        if (layer && layer instanceof L.Polyline && !(layer instanceof L.Marker)) {
+            const polylineObj = this.polylines.find(pl => pl.polyline === layer);
+            if (polylineObj) {
+                this.deletePolylineById(polylineObj.id);
+            }
+        }
+    }
+
     addPointMode() {
         this.addMode = !this.addMode;
         this.drawMode = false;
+        this.deleteMode = false;
         const btn = document.querySelector('[onclick="app.addPointMode()"]');
         
         if (this.addMode) {
@@ -221,12 +282,32 @@ class ProspectingApp {
     drawLineMode() {
         this.drawMode = !this.drawMode;
         this.addMode = false;
+        this.deleteMode = false;
         this.drawPoints = [];
         const btn = document.querySelector('[onclick="app.drawLineMode()"]');
         
         if (this.drawMode) {
             this.showNotification('✏️ Cliquez sur la carte pour tracer une ligne.', 'info');
             btn.style.background = 'var(--warning)';
+            btn.style.color = 'white';
+            this.map.dragging.disable();
+        } else {
+            btn.style.background = '';
+            btn.style.color = '';
+            this.map.dragging.enable();
+        }
+    }
+
+    deleteMode() {
+        this.deleteMode = !this.deleteMode;
+        this.addMode = false;
+        this.drawMode = false;
+        this.drawPoints = [];
+        const btn = document.querySelector('[onclick="app.deleteMode()"]');
+        
+        if (this.deleteMode) {
+            this.showNotification('🗑️ Cliquez sur un point ou une ligne pour le supprimer', 'info');
+            btn.style.background = 'var(--danger)';
             btn.style.color = 'white';
             this.map.dragging.disable();
         } else {
@@ -349,8 +430,12 @@ class ProspectingApp {
         }).addTo(this.map);
 
         polyline.on('click', () => {
-            this.selectedPolyline = { ...polylineObj, polyline };
-            this.showPolylineInfo(this.selectedPolyline);
+            if (this.deleteMode) {
+                this.deletePolylineById(polylineObj.id);
+            } else {
+                this.selectedPolyline = { ...polylineObj, polyline };
+                this.showPolylineInfo(this.selectedPolyline);
+            }
         });
 
         this.polylines.push({ ...polylineObj, polyline });
@@ -405,8 +490,18 @@ class ProspectingApp {
                         <span class="info-label">📋 Notes:</span>
                         <span class="info-value">${polylineObj.notes || 'Aucune note'}</span>
                     </div>
-                    <button class="btn-primary" onclick="app.markLineFollowedUp(${polylineObj.id})" style="margin-top: 12px;">
+                    <div class="info-row">
+                        <span class="info-label">✏️ Renommer:</span>
+                        <input type="text" id="line-rename-input" class="rename-input" value="${polylineObj.address}" placeholder="Nouveau nom">
+                    </div>
+                    <button class="btn-primary" onclick="app.renamePolyline(${polylineObj.id})" style="margin-top: 8px;">
+                        💾 Renommer
+                    </button>
+                    <button class="btn-primary" onclick="app.markLineFollowedUp(${polylineObj.id})" style="margin-top: 8px; background: #16a34a;">
                         ✓ Marquer comme suivi fait
+                    </button>
+                    <button class="btn-secondary" onclick="app.deletePolylineById(${polylineObj.id})" style="margin-top: 8px; background: var(--danger); color: white;">
+                        🗑️ Supprimer
                     </button>
                 </div>
             </div>
@@ -430,6 +525,24 @@ class ProspectingApp {
             this.polylineInfoContainer = null;
         }
         this.selectedPolyline = null;
+    }
+
+    renamePolyline(polylineId) {
+        const polyline = this.polylines.find(p => p.id === polylineId);
+        if (!polyline) return;
+
+        const newName = document.getElementById('line-rename-input').value.trim();
+        
+        if (!newName) {
+            this.showNotification('❌ Le nom ne peut pas être vide', 'error');
+            return;
+        }
+
+        polyline.address = newName;
+        this.saveData();
+        this.closePolylineInfo();
+        this.showNotification('✅ Ligne renommée!', 'success');
+        this.updateHistory();
     }
 
     markLineFollowedUp(polylineId) {
@@ -471,23 +584,17 @@ class ProspectingApp {
             }).addTo(this.map);
 
             newPolyline.on('click', () => {
-                this.selectedPolyline = { ...pl, polyline: newPolyline };
-                this.showPolylineInfo(this.selectedPolyline);
+                if (this.deleteMode) {
+                    this.deletePolylineById(pl.id);
+                } else {
+                    this.selectedPolyline = { ...pl, polyline: newPolyline };
+                    this.showPolylineInfo(this.selectedPolyline);
+                }
             });
             
             pl.color = newColor;
             pl.polyline = newPolyline;
         });
-    }
-
-    clearAllLines() {
-        if (!confirm('Êtes-vous sûr?')) return;
-        this.polylines.forEach(pl => {
-            if (pl.polyline) this.map.removeLayer(pl.polyline);
-        });
-        this.polylines = [];
-        this.saveData();
-        this.showNotification('🗑️ Lignes supprimées', 'info');
     }
 
     getUserLocation() {
