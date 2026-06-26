@@ -193,6 +193,7 @@ body {
 .map-controls {
     display: flex;
     gap: 8px;
+    flex-wrap: wrap;
 }
 
 .btn-icon {
@@ -226,6 +227,43 @@ body {
 .leaflet-container {
     height: 100%;
     width: 100%;
+}
+
+/* ===== LÉGENDE DES LIGNES ===== */
+.legend-box {
+    position: absolute;
+    bottom: 100px;
+    left: 20px;
+    background: var(--bg-white);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: var(--shadow-lg);
+    z-index: 400;
+    max-width: 200px;
+}
+
+.legend-title {
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.legend-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 2px;
+    border: 1px solid rgba(0, 0, 0, 0.2);
 }
 
 /* ===== PANNEAU D'INFOS ===== */
@@ -681,6 +719,13 @@ body {
     .map-controls {
         width: 100%;
         justify-content: space-around;
+    }
+
+    .legend-box {
+        bottom: 20px;
+        left: 10px;
+        right: 10px;
+        max-width: none;
     }
 }
 
